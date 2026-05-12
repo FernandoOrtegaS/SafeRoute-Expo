@@ -17,7 +17,7 @@ Para ejecutar la app en un equipo nuevo necesitas ademas una de estas opciones:
 ## Clonar e instalar
 
 ```bash
-git clone https://github.com/TU_USUARIO/saferoute_expo_template.git
+git clone https://github.com/FernandoOrtegaS/SafeRoute-Expo.git
 cd saferoute_expo_template
 npm install
 ```
