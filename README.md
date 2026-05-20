@@ -1,62 +1,50 @@
-# SafeRoute Expo Template
+# Welcome to your Expo app 👋
 
-Proyecto base con Expo y React Native.
+This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
 
-## Requisitos
+## Get started
 
-- Node.js 20.19 o superior
-- npm 11 o superior
-- Git
+1. Install dependencies
 
-Para ejecutar la app en un equipo nuevo necesitas ademas una de estas opciones:
+   ```bash
+   npm install
+   ```
 
-- Expo Go en un telefono fisico
-- Android Studio con emulador Android
-- Xcode si vas a correr iOS en macOS
+2. Start the app
 
-## Clonar e instalar
+   ```bash
+   npx expo start
+   ```
+
+In the output, you'll find options to open the app in a
+
+- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
+- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
+- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
+- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+
+You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+
+## Get a fresh project
+
+When you're ready, run:
 
 ```bash
-git clone https://github.com/FernandoOrtegaS/SafeRoute-Expo.git
-cd saferoute_expo_template
-npm install
+npm run reset-project
 ```
 
-## Ejecutar
+This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
-```bash
-npm start
-```
+## Learn more
 
-Tambien puedes usar:
+To learn more about developing your project with Expo, look at the following resources:
 
-```bash
-npm run android
-npm run ios
-npm run web
-```
+- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
+- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
 
-## Archivos que si se deben subir
+## Join the community
 
-- `App.tsx`
-- `index.ts`
-- `app.json`
-- `package.json`
-- `package-lock.json`
-- `tsconfig.json`
-- `assets/`
+Join our community of developers creating universal apps.
 
-## Archivos que no se deben subir
-
-Ya estan cubiertos por `.gitignore`:
-
-- `node_modules/`
-- `.expo/`
-- `android/` y `ios/` generados por Expo prebuild
-- logs locales como `expo.stdout.log`
-
-## Notas
-
-- No subas rutas absolutas de tu computador. El proyecto debe funcionar solo con archivos relativos dentro del repositorio.
-- Si en el futuro usas variables de entorno, sube un archivo `.env.example` con nombres de ejemplo y deja los valores reales fuera de Git.
-- Si alguien clona el repo, lo correcto es que ejecute `npm install` y luego `npm start`. No debes subir `node_modules`.
+- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
+- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
