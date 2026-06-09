@@ -29,7 +29,7 @@ export default function HomeScreen() {
 
   const GOOGLE_MAPS_APIKEY = 'AIzaSyBdLccbhV2MPNVXgs4PEISQCmE8LY9A7e0';
 
-  //database
+  //select from database
 
   const [cat_reports, setCatReports] = useState<ReportCategory[]>([]);
 
