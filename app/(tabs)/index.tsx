@@ -1,21 +1,66 @@
-import { Alert, StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
-import React, { useEffect, useState } from 'react';
-import MapView, { Circle, Marker } from 'react-native-maps';
+import { Alert, StyleSheet, View, Text, TextInput, TouchableOpacity, FlatList } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import MapView, { Circle, LatLng, Marker, Region } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
+import { Float } from 'react-native/Libraries/Types/CodegenTypes';
+import { supabase } from '../../utils/supabase';
+
+interface ReportCategory {
+  id: string;
+  name: string;
+  icon_name: string;
+  severity_weight: number;
+  created_at: string;
+}
 
 export default function HomeScreen() {
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [originInput, setOriginInput] = useState('Elegir ubicación actual');
   const [destinationInput, setDestinationInput] = useState('');
   const [showInputs, setShowInputs] = useState(false);
-  const [routeOrigin, setRouteOrigin] = useState<string | { latitude: number; longitude: number }>('Elegir ubicación actual');
-  const [routeDestination, setRouteDestination] = useState<string>('');
+  const [routeOrigin, setRouteOrigin] = useState<string | LatLng>('Elegir ubicación actual');
+  const [routeDestination, setRouteDestination] = useState<string | LatLng>('');
+  const [initRegion, setInitRegion] = useState<Region | undefined>(undefined);
+  const [region, setRegion] = useState<Region | undefined>(undefined);
 
-  const origin = {latitude: -33.440058, longitude: -70.640881};
-  const destination = {latitude: -33.436872, longitude: -70.638914};
+  const mapRef = useRef<MapView>(null);
+
   const GOOGLE_MAPS_APIKEY = 'AIzaSyBdLccbhV2MPNVXgs4PEISQCmE8LY9A7e0';
+
+  //database
+
+  const [cat_reports, setCatReports] = useState<ReportCategory[]>([]);
+
+  useEffect(() => {
+    const getData = async () => {
+      try {
+        const {data: cat_reports, error} = await supabase.from('report_categories').select();
+
+
+        if (error) {
+          console.error('Error fetching data', error.message);
+          return;
+        }
+
+        if (cat_reports && cat_reports.length > 0) {
+          setCatReports(cat_reports);
+          console.log(cat_reports);
+
+        }
+      } catch (error) {
+        // Cambia el contenido del catch por esto:
+        if (error instanceof Error) {
+          console.error('Error fetching data:', error.message); 
+        } else {
+          console.error('Error fetching data:', String(error));
+        }
+      }
+    };
+
+    getData();
+  }, []);
 
   useEffect(() => {
     const requestLocationPermission = async () => {
@@ -24,6 +69,7 @@ export default function HomeScreen() {
         if (status === Location.PermissionStatus.GRANTED) {
           const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Highest });
           setUserLocation({ latitude: coords.latitude, longitude: coords.longitude });
+          setInitRegion({ latitude: coords.latitude, longitude: coords.longitude, latitudeDelta: 0.008, longitudeDelta: 0.008 });
         } else {
           Alert.alert(
             'Permiso de ubicación',
@@ -63,60 +109,75 @@ export default function HomeScreen() {
     setShowInputs(false);
   };
 
+  const handleCenterLocation = () => {
+    if (userLocation && mapRef.current) {
+      mapRef.current.animateToRegion({
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+        latitudeDelta: 0.008,
+        longitudeDelta: 0.008,
+      }, 500);
+    } else {
+      Alert.alert('Ubicación no lista', 'Aún estamos obteniendo tu ubicación actual.');
+    }
+  };
+
   const lats = [];
   const lngs = [];
 
+  // Si routeOrigin es el texto por defecto, lo dejamos como undefined
   const currentRouteOrigin =
     typeof routeOrigin === 'string' && routeOrigin === 'Elegir ubicación actual'
-      ? origin
+      ? undefined
       : routeOrigin;
-  const currentRouteDestination = routeDestination || destination;
+
+  // Si routeDestination está vacío, lo dejamos como undefined
+  const currentRouteDestination = routeDestination !== '' ? routeDestination : undefined;
+
+  if (!initRegion) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text>Obteniendo tu ubicación segura...</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <MapView style={styles.map}
+      <MapView
+        ref={mapRef}
+        style={styles.map}
         provider="google"
-        region={{
-          latitude: -33.438367,
-          longitude: -70.640500,
-          latitudeDelta: 0.008,
-          longitudeDelta: 0.008,
-        }}
+        initialRegion={initRegion}
         showsUserLocation={true}
         zoomEnabled={true}
         rotateEnabled={false}
         scrollEnabled={true}
         pitchEnabled={false}
       >
-        <Circle
-          center={destination}
-          radius={10}
-          strokeColor='blue'
-          fillColor='blue'
-        />
-        <Circle
-          center={origin}
-          radius={10}
-          strokeColor='blue'
-          fillColor='blue'
-        />
-        {userLocation && (
-          <Marker
-            coordinate={userLocation}
-            title="Tu ubicación"
-            pinColor="green"
+        {currentRouteDestination && currentRouteOrigin && (
+          <MapViewDirections
+            origin={currentRouteOrigin}
+            destination={currentRouteDestination}
+            apikey={GOOGLE_MAPS_APIKEY}
+            mode='WALKING'
+            strokeWidth={10}
+            onReady={(result) => {
+              // Verificamos que la referencia al mapa exista
+              if (mapRef.current) {
+                mapRef.current.fitToCoordinates(result.coordinates, {
+                  edgePadding: {
+                    top: 150,    // Mayor padding superior por tu Header flotante
+                    right: 50,
+                    bottom: 100, // Mayor padding inferior para que no lo tape el botón de ubicación
+                    left: 50,
+                  },
+                  animated: true, // Hace que el cambio de cámara sea suave
+                });
+              }
+            }}
           />
         )}
-        <Marker
-          coordinate={destination}
-        />
-        <MapViewDirections
-          origin={currentRouteOrigin}
-          destination={currentRouteDestination}
-          apikey={GOOGLE_MAPS_APIKEY}
-          mode='WALKING'
-          strokeWidth={10}
-        />
       </MapView>
 
       {/* Header y Inputs */}
@@ -166,6 +227,10 @@ export default function HomeScreen() {
         </View>
       </View>
       )}
+
+      <TouchableOpacity style={styles.myLocationButton} onPress={handleCenterLocation}>
+        <Ionicons name="locate" size={24} color="#1E5A96" />
+      </TouchableOpacity>
     </View>
   );
 }
@@ -270,5 +335,19 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '600',
+  },
+  myLocationButton: {
+    position: 'absolute',
+    bottom: 20, // Puedes ajustar esto si tienes una barra de navegación inferior
+    right: 20,
+    backgroundColor: 'white',
+    borderRadius: 30,
+    padding: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    zIndex: 10,
   },
 });

@@ -1,0 +1,15 @@
+{"_e":"root:init","_t":1781012788405,"format":"v0-jsonl","version":"56.1.14"}
+{"_e":"env:mode","_t":1781012788406,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1781012788414,"mode":"development","files":["../../../.env.local"],"env":{"EXPO_PUBLIC_SUPABASE_KEY":"sb_publishable_h-AchJfMYgWf3YZTb0wi8A_WhbNHYWd","EXPO_PUBLIC_SUPABASE_URL":"https://lzzddxhmlsbrzkeieyud.supabase.co"}}
+{"_e":"devserver:start","_t":1781012789127,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":true,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1781012789821,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":true,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:instantiate","_t":1781012797761,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:client_log","_t":1781012819374,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThe project you requested requires a newer version of Expo Go.\n\nHow to fix this error:\n\nDownload the latest version of Expo Go from the App Store."]}
+{"_e":"metro:client_log","_t":1781012831428,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThe project you requested requires a newer version of Expo Go.\n\nHow to fix this error:\n\nDownload the latest version of Expo Go from the App Store."]}
+{"_e":"root:init","_t":1781013175638,"format":"v0-jsonl","version":"56.1.14"}
+{"_e":"env:mode","_t":1781013175639,"nodeEnv":"development","babelEnv":"development","mode":"development"}
+{"_e":"env:load","_t":1781013175643,"mode":"development","files":["../../../.env.local"],"env":{"EXPO_PUBLIC_SUPABASE_KEY":"sb_publishable_h-AchJfMYgWf3YZTb0wi8A_WhbNHYWd","EXPO_PUBLIC_SUPABASE_URL":"https://lzzddxhmlsbrzkeieyud.supabase.co"}}
+{"_e":"devserver:start","_t":1781013175953,"mode":"development","web":true,"baseUrl":"","asyncRoutes":false,"routerRoot":"../../../app","serverComponents":false,"serverActions":false,"serverRendering":true,"apiRoutes":false,"exporting":false}
+{"_e":"metro:config","_t":1781013176216,"serverRoot":"../../..","projectRoot":"../../..","exporting":false,"flags":{"autolinkingModuleResolution":false,"serverActions":false,"serverComponents":false,"reactCompiler":true,"optimizeGraph":false,"treeshaking":false,"logbox":false}}
+{"_e":"metro:instantiate","_t":1781013179863,"atlas":false,"workers":6,"host":"::","port":8081}
+{"_e":"metro:client_log","_t":1781013199959,"level":"error","data":["Project is incompatible with this version of Expo Go\n\nThe project you requested requires a newer version of Expo Go.\n\nHow to fix this error:\n\nDownload the latest version of Expo Go from the App Store."]}
