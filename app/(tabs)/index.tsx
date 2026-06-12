@@ -1,14 +1,55 @@
 import { Alert, Animated, StyleSheet, View, Text, TextInput, TouchableOpacity } from 'react-native';
 import React, { useEffect, useState, useRef } from 'react';
-import MapView, { LatLng, Region } from 'react-native-maps';
+import MapView, { LatLng, Region, Marker, Callout, Polyline, Circle } from 'react-native-maps';
 import MapViewDirections from 'react-native-maps-directions';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../utils/supabase';
 
+const customMapStyle = [
+  {
+    featureType: "poi", // "Points of Interest" (tiendas, restaurantes, bancos, etc.)
+    stylers: [
+      {
+        visibility: "off",
+      },
+    ],
+  },
+  {
+    featureType: "transit", // Transporte público (opcional, oculta íconos de paraderos de micro/metro)
+    elementType: "labels.icon",
+    stylers: [
+      {
+        visibility: "off",
+      },
+    ],
+  }
+];
+
+interface StreetSegment {
+  id: string;
+  name: string;
+  start_latitude: number;
+  start_longitude: number;
+  end_latitude: number;
+  end_longitude: number;
+  safety_score: number;
+}
+
 interface RouteInfo {
   duration: number;
   distance: number;
+}
+
+interface Incident {
+  id: string;
+  category: string;
+  title: string;
+  description: string;
+  latitude: number;
+  longitude: number;
+  urgency: string;
+  vote_count: number;
 }
 
 export default function HomeScreen() {
@@ -22,6 +63,9 @@ export default function HomeScreen() {
   const [destinationSuggestions, setDestinationSuggestions] = useState<{ description: string; place_id: string }[]>([]);
   const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
 
+  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const [streetSegments, setStreetSegments] = useState<StreetSegment[]>([]);
+  
   const mapRef = useRef<MapView>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sheetAnim = useRef(new Animated.Value(400)).current;
@@ -75,6 +119,57 @@ export default function HomeScreen() {
       }
     }, 400);
   };
+
+  useEffect(() => {
+    const fetchIncidents = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('incidents')
+          .select('id, category, title, description, latitude, longitude, urgency, vote_count')
+          .eq('is_active', true); // Solo mostramos los que están activos en el mapa
+
+        if (error) {
+          console.error('Error fetching incidents:', error.message);
+          return;
+        }
+
+        if (data) {
+          setIncidents(data);
+        }
+      } catch (error) {
+        if (error instanceof Error) {
+          console.error('Error en fetchIncidents:', error.message);
+        } else {
+          console.error('Error en fetchIncidents:', String(error));
+        }
+      }
+    };
+
+    fetchIncidents();
+  }, []);
+
+  useEffect(() => {
+    const fetchStreets = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('street_segments')
+          .select('*');
+
+        if (error) {
+          console.error('Error fetching streets:', error.message);
+          return;
+        }
+
+        if (data) {
+          setStreetSegments(data);
+        }
+      } catch (error) {
+        console.error('Error en fetchStreets:', String(error));
+      }
+    };
+
+    fetchStreets();
+  }, []);
 
   const handleSelectSuggestion = (description: string) => {
     setDestinationInput(description);
@@ -144,6 +239,7 @@ export default function HomeScreen() {
         rotateEnabled={false}
         scrollEnabled={true}
         pitchEnabled={false}
+        customMapStyle={customMapStyle}
       >
         {currentRouteDestination && currentRouteOrigin && (
           <MapViewDirections
@@ -167,6 +263,112 @@ export default function HomeScreen() {
             }}
           />
         )}
+        {incidents.map((incident) => {
+          const urgencyLevel = incident.urgency?.toLowerCase() || 'normal';
+          let dotColor = '#FF9800'; // Naranja por defecto (normal)
+          
+          if (urgencyLevel === 'alta' || urgencyLevel === 'urgente' || urgencyLevel === 'high') {
+            dotColor = '#F44336'; // Rojo (alta)
+          } else if (urgencyLevel === 'baja' || urgencyLevel === 'no_urgente') {
+            dotColor = '#FFEB3B'; // Amarillo (baja)
+          }
+
+          return (
+            <Marker
+              key={incident.id}
+              coordinate={{
+                latitude: incident.latitude,
+                longitude: incident.longitude,
+              }}
+            >
+              {/* --- AQUÍ CREAMOS EL PIN PERSONALIZADO --- */}
+              <View style={{
+                width: 24, 
+                height: 24,
+                borderRadius: 12, // La mitad del width/height para hacerlo circular
+                backgroundColor: dotColor,
+                borderWidth: 2,
+                borderColor: 'white', // Borde blanco para que resalte sobre las calles
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.4,
+                shadowRadius: 3,
+                elevation: 5,
+              }} />
+
+              {/* El Callout sigue funcionando igual */}
+              <Callout tooltip={false}>
+                <View style={{ padding: 8, minWidth: 160 }}>
+                  <Text style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 4 }}>
+                    {incident.title}
+                  </Text>
+                  
+                  <Text style={{ fontSize: 13, color: '#1E5A96', fontWeight: '600', marginBottom: 2 }}>
+                    Categoría: {incident.category}
+                  </Text>
+                  
+                  <Text style={{ fontSize: 12, color: '#666', marginBottom: 4 }}>
+                    Urgencia: <Text style={{fontWeight: 'bold'}}>{incident.urgency}</Text> | Votos: {incident.vote_count}
+                  </Text>
+                  
+                  {incident.description ? (
+                    <Text style={{ fontSize: 12, fontStyle: 'italic', marginTop: 4, color: '#444' }}>
+                      "{incident.description}"
+                    </Text>
+                  ) : null}
+                </View>
+              </Callout>
+            </Marker>
+          );
+        })}
+        {streetSegments.map((segment) => {
+          const score = Number(segment.safety_score);
+          let lineColor = 'rgba(76, 175, 80, 1)'; 
+          
+          if (score < 40) {
+            lineColor = 'rgba(244, 67, 54, 1)'; 
+          } else if (score >= 40 && score <= 70) {
+            lineColor = 'rgba(255, 152, 0, 1)'; 
+          }
+
+          const startCoords = { latitude: Number(segment.start_latitude), longitude: Number(segment.start_longitude) };
+          const endCoords = { latitude: Number(segment.end_latitude), longitude: Number(segment.end_longitude) };
+
+          return (
+            <React.Fragment key={segment.id}>
+              {/* 1. La línea principal */}
+              <Polyline
+                coordinates={[startCoords, endCoords]}
+                strokeColor={lineColor}
+                fillColor={lineColor}
+                strokeColors={[lineColor]}
+                strokeWidth={8}
+                lineCap="round" // Se deja puesto porque en Android sí funciona mágicamente
+                lineJoin="round"
+                zIndex={5}
+                geodesic={true}
+              />
+              
+              {/* 2. Círculo para redondear el INICIO de la línea (Truco para iOS) */}
+              <Circle
+                center={startCoords}
+                radius={6} // Radio en metros (ajústalo si la línea se ve muy gruesa o delgada al hacer zoom)
+                fillColor={lineColor}
+                strokeColor="transparent"
+                zIndex={5}
+              />
+
+              {/* 3. Círculo para redondear el FIN de la línea (Truco para iOS) */}
+              <Circle
+                center={endCoords}
+                radius={6}
+                fillColor={lineColor}
+                strokeColor="transparent"
+                zIndex={5}
+              />
+            </React.Fragment>
+          );
+        })}
       </MapView>
 
       {!routeInfo && (
