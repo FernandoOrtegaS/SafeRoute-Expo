@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet, View, Text, TouchableOpacity, ScrollView,
-  Switch, Alert, Platform, Image,
+  Switch, Alert, Platform, Image, Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '../../utils/supabase';
+import * as Contacts from 'expo-contacts';
 
 type IncidentCategory = 'robo' | 'trafico' | 'iluminacion' | 'infraestructura' | 'seguridad' | 'otro';
 
@@ -23,6 +24,12 @@ interface Incident {
   title: string;
   created_at: string;
   vote_count: number;
+}
+
+interface EmergencyContact {
+  id: string;
+  name: string;
+  phone: string;
 }
 
 const CATEGORY_COLORS: Record<IncidentCategory, string> = {
@@ -54,17 +61,21 @@ export default function PerfilScreen() {
   const [userIncidents, setUserIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
+  const [showContactsModal, setShowContactsModal] = useState(false);
+
   useEffect(() => { loadProfile(); }, []);
 
   const loadProfile = async () => {
     setLoading(true);
     const { data: { session } } = await supabase.auth.getSession();
     if (session?.user) {
-      const [profileRes, incidentsRes] = await Promise.all([
+      const [profileRes, incidentsRes, contactsRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', session.user.id).single(),
         supabase.from('incidents').select('id, category, title, created_at, vote_count')
           .eq('user_id', session.user.id).eq('is_active', true)
           .order('created_at', { ascending: false }).limit(10),
+        supabase.from('emergency_contacts').select('id, name, phone').eq('user_id', session.user.id),
       ]);
 
       const authName = session.user.user_metadata?.name ?? session.user.email?.split('@')[0] ?? 'Usuario';
@@ -88,6 +99,10 @@ export default function PerfilScreen() {
         });
       }
       if (incidentsRes.data) setUserIncidents(incidentsRes.data as Incident[]);
+
+      if (contactsRes.data) {
+        setEmergencyContacts(contactsRes.data as EmergencyContact[]);
+      }
     }
     setLoading(false);
   };
@@ -103,6 +118,68 @@ export default function PerfilScreen() {
     Alert.alert('Cerrar sesión', '¿Estás seguro de que quieres salir?', [
       { text: 'Cancelar', style: 'cancel' },
       { text: 'Cerrar sesión', style: 'destructive', onPress: () => supabase.auth.signOut() },
+    ]);
+  };
+
+  const handleAddContact = async () => {
+    try {
+      const { status } = await Contacts.requestPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permiso denegado', 'SafeRoute necesita acceso a tus contactos.');
+        return;
+      }
+
+      const contact = await Contacts.presentContactPickerAsync();
+      
+      if (contact) {
+        // Corrección del nombre para iOS: unimos nombre y apellido si existen
+        const name = contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' ') || 'Sin nombre';
+        const phone = contact.phoneNumbers && contact.phoneNumbers.length > 0 
+          ? contact.phoneNumbers[0].number 
+          : null;
+
+        if (!phone) {
+          Alert.alert('Sin número', 'El contacto seleccionado no tiene un teléfono guardado.');
+          return;
+        }
+
+        if (profile?.id) {
+          // Usamos .select().single() para que Supabase nos devuelva el contacto recién creado con su ID
+          const { data, error } = await supabase.from('emergency_contacts').insert({
+            user_id: profile.id,
+            name: name,
+            phone: phone,
+          }).select().single();
+
+          if (error) {
+            Alert.alert('Error', 'Hubo un problema al guardar el contacto.');
+          } else if (data) {
+            // Actualizamos la lista local al instante
+            setEmergencyContacts(prev => [...prev, data as EmergencyContact]);
+            Alert.alert('¡Añadido!', `${name} ahora es tu contacto de emergencia.`);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error al abrir contactos:', error);
+    }
+  };
+
+  const handleDeleteContact = (id: string, name: string) => {
+    Alert.alert('Eliminar contacto', `¿Seguro que quieres eliminar a ${name}?`, [
+      { text: 'Cancelar', style: 'cancel' },
+      { 
+        text: 'Eliminar', 
+        style: 'destructive', 
+        onPress: async () => {
+          const { error } = await supabase.from('emergency_contacts').delete().eq('id', id);
+          if (!error) {
+            setEmergencyContacts(prev => prev.filter(c => c.id !== id));
+          } else {
+            Alert.alert('Error', 'No se pudo eliminar el contacto.');
+          }
+        } 
+      },
     ]);
   };
 
@@ -174,8 +251,8 @@ export default function PerfilScreen() {
           </TouchableOpacity>
 
           <View style={styles.separator} />
-
-          <TouchableOpacity style={styles.optionRow}>
+          
+          <TouchableOpacity style={styles.optionRow} onPress={() => setShowContactsModal(true)}>
             <View style={[styles.optionIconBox, { backgroundColor: '#FFEBEE' }]}>
               <Ionicons name="people" size={20} color="#E53935" />
             </View>
@@ -218,6 +295,50 @@ export default function PerfilScreen() {
           <Text style={styles.signOutText}>Cerrar sesión</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      <Modal visible={showContactsModal} animationType="slide" presentationStyle="pageSheet">
+        <View style={{ flex: 1, backgroundColor: '#F8F8F8', paddingTop: Platform.OS === 'ios' ? 20 : 0 }}>
+          {/* Cabecera del Modal */}
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: 'white', borderBottomWidth: 1, borderBottomColor: '#EEE' }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold' }}>Tus Contactos</Text>
+            <TouchableOpacity onPress={() => setShowContactsModal(false)}>
+              <Text style={{ color: '#1E5A96', fontWeight: '600', fontSize: 16 }}>Cerrar</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Lista de Contactos */}
+          <ScrollView style={{ padding: 20 }}>
+            {emergencyContacts.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#888', marginTop: 20 }}>No tienes contactos de emergencia configurados.</Text>
+            ) : (
+              emergencyContacts.map(contact => (
+                <View key={contact.id} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: 'white', padding: 15, borderRadius: 12, marginBottom: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.05, elevation: 2 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#E53935', justifyContent: 'center', alignItems: 'center', marginRight: 15 }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>{contact.name.charAt(0)}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 16, color: '#333' }}>{contact.name}</Text>
+                    <Text style={{ color: '#666', marginTop: 2 }}>{contact.phone}</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => handleDeleteContact(contact.id, contact.name)}>
+                    <Ionicons name="trash-outline" size={22} color="#E53935" />
+                  </TouchableOpacity>
+                </View>
+              ))
+            )}
+
+            {/* Botón Añadir */}
+            <TouchableOpacity 
+              onPress={handleAddContact}
+              style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', backgroundColor: '#1E5A96', padding: 15, borderRadius: 12, marginTop: 10 }}
+            >
+              <Ionicons name="add" size={20} color="white" style={{ marginRight: 8 }} />
+              <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 16 }}>Añadir nuevo contacto</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
+      
     </View>
   );
 }
