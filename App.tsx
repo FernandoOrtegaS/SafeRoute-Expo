@@ -1,7 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import * as Location from 'expo-location';
-import { Platform, SafeAreaView, StyleSheet, Text, View, Alert } from 'react-native';
-import { useEffect, useState } from 'react';
+import { Platform, SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import { useEffect } from 'react';
 
 const initialRegion = {
   latitude: -33.439078,
@@ -11,26 +11,14 @@ const initialRegion = {
 };
 
 export default function App() {
-  const [hasLocationPermission, setHasLocationPermission] = useState<boolean | null>(null);
-  const MapView =
-    Platform.OS === 'web' ? null : require('react-native-maps').default;
+  const MapView = Platform.OS === 'web' ? null : require('react-native-maps').default;
 
   useEffect(() => {
     const requestLocationPermission = async () => {
       try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        const granted = status === Location.PermissionStatus.GRANTED;
-        setHasLocationPermission(granted);
-
-        if (!granted) {
-          Alert.alert(
-            'Permiso de ubicación',
-            'Necesitamos acceso a tu ubicación para mostrar el mapa correctamente.',
-          );
-        }
+        await Location.requestForegroundPermissionsAsync();
       } catch (error) {
-        console.warn('Error al solicitar permisos de ubicación:', error);
-        setHasLocationPermission(false);
+        console.warn('Error al solicitar permisos de ubicacion:', error);
       }
     };
 
@@ -49,16 +37,7 @@ export default function App() {
         ) : (
           <View style={styles.webMapFallback}>
             <Text style={styles.webMapTitle}>Mapa no disponible en web</Text>
-            <Text style={styles.webMapText}>
-              Abre la app en Expo Go para ver el mapa nativo.
-            </Text>
-          </View>
-        )}
-        {hasLocationPermission === false && (
-          <View style={styles.permissionWarning}>
-            <Text style={styles.permissionWarningText}>
-              Permiso de ubicación denegado. Activa el permiso en los ajustes para usar el mapa.
-            </Text>
+            <Text style={styles.webMapText}>Abre la app en Expo Go para ver el mapa nativo.</Text>
           </View>
         )}
       </View>
@@ -108,20 +87,6 @@ const styles = StyleSheet.create({
     color: '#4E6259',
     fontSize: 16,
     marginTop: 8,
-    textAlign: 'center',
-  },
-  permissionWarning: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    bottom: 16,
-    backgroundColor: '#F8D7DA',
-    borderRadius: 16,
-    padding: 12,
-  },
-  permissionWarningText: {
-    color: '#842029',
-    fontSize: 14,
     textAlign: 'center',
   },
 });

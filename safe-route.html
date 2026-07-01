@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute — Ruta Segura</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { width: 100%; height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+        /* Mapa ocupa toda la pantalla */
+        #map {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            z-index: 1;
+        }
+
+        /* Panel flotante arriba */
+        #panel {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 1000;
+            background: rgba(18, 18, 35, 0.97);
+            border-bottom: 1px solid #0f3460;
+            padding: 12px 16px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            backdrop-filter: blur(6px);
+        }
+
+        .logo {
+            color: #e94560;
+            font-weight: 700;
+            font-size: 17px;
+            align-self: center;
+            white-space: nowrap;
+            margin-right: 4px;
+        }
+
+        .ig {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+            min-width: 150px;
+        }
+
+        label {
+            font-size: 10px;
+            color: #888;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        input[type="text"] {
+            background: #16213e;
+            border: 1px solid #2a3a5e;
+            color: #eee;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 100%;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { border-color: #e94560; }
+        input[type="text"]::placeholder { color: #555; }
+
+        #btn-calc {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 9px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            align-self: flex-end;
+            transition: background 0.2s;
+        }
+        #btn-calc:hover { background: #c73652; }
+        #btn-calc:disabled { background: #444; cursor: not-allowed; }
+
+        /* Tip bar */
+        #tip {
+            position: fixed;
+            top: 64px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 999;
+            background: rgba(18,18,35,0.85);
+            border: 1px solid #0f3460;
+            color: #666;
+            font-size: 11px;
+            padding: 4px 14px;
+            border-radius: 20px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        #tip span { color: #e94560; }
+
+        /* Status loading */
+        #status-msg {
+            position: fixed;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 2000;
+            background: rgba(10,10,28,0.95);
+            color: white;
+            padding: 9px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: none;
+            white-space: nowrap;
+            border: 1px solid #2a3a5e;
+        }
+
+        /* Info box flotante */
+        #info-box {
+            position: fixed;
+            bottom: 24px;
+            right: 16px;
+            z-index: 1000;
+            background: rgba(18,18,35,0.97);
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 14px 16px;
+            min-width: 220px;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        #info-box h3 {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+        }
+        .score-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        .score-circle {
+            width: 52px; height: 52px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 19px; font-weight: 700; color: white;
+            flex-shrink: 0;
+        }
+        .score-label { font-size: 12px; color: #aaa; line-height: 1.5; }
+        .score-label strong { font-size: 14px; color: white; display: block; }
+        hr.div { border: none; border-top: 1px solid #1a2a4a; margin: 8px 0; }
+        .stat { display: flex; justify-content: space-between; margin: 4px 0; }
+        .stat-l { font-size: 11px; color: #888; }
+        .stat-v { font-size: 11px; font-weight: 600; }
+
+        /* Leyenda */
+        #legend {
+            position: fixed;
+            bottom: 24px;
+            left: 16px;
+            z-index: 1000;
+            background: rgba(18,18,35,0.97);
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 10px 14px;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+        #legend h4 { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+        .li { display: flex; align-items: center; gap: 8px; margin: 5px 0; font-size: 11px; color: #bbb; }
+        .lc { width: 22px; height: 4px; border-radius: 2px; flex-shrink: 0; }
+
+        /* Tooltip de Leaflet */
+        .leaflet-tooltip { font-size: 12px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="panel">
+    <span class="logo">SafeRoute</span>
+    <div class="ig">
+        <label>Origen</label>
+        <input type="text" id="origin" placeholder="Ej: Plaza de Armas, Santiago"/>
+    </div>
+    <div class="ig">
+        <label>Destino</label>
+        <input type="text" id="destination" placeholder="Ej: Estadio Nacional, Santiago"/>
+    </div>
+    <div class="ig" style="max-width:210px">
+        <label>API Key — openrouteservice.org</label>
+        <input type="text" id="apikey" placeholder="Pega tu API key aquí"/>
+    </div>
+    <button id="btn-calc" onclick="calcularRuta()">Calcular ruta segura</button>
+</div>
+
+<div id="tip">
+    Clic en mapa: <span>1er clic = origen</span> · <span>2do clic = destino</span>
+</div>
+
+<div id="status-msg"></div>
+
+<div id="info-box">
+    <h3>Análisis de seguridad · OSM</h3>
+    <div class="score-wrap">
+        <div id="score-circle" class="score-circle" style="background:#444">—</div>
+        <div class="score-label">
+            <strong id="score-text">—</strong>
+            Score de seguridad
+        </div>
+    </div>
+    <hr class="div"/>
+    <div class="stat">
+        <span class="stat-l">Distancia</span>
+        <span class="stat-v" id="stat-dist" style="color:#aaa">—</span>
+    </div>
+    <div class="stat">
+        <span class="stat-l">Tiempo a pie</span>
+        <span class="stat-v" id="stat-time" style="color:#aaa">—</span>
+    </div>
+    <hr class="div"/>
+    <div class="stat">
+        <span class="stat-l">Segura</span>
+        <span class="stat-v" id="stat-safe" style="color:#27ae60">—</span>
+    </div>
+    <div class="stat">
+        <span class="stat-l">Media</span>
+        <span class="stat-v" id="stat-med" style="color:#f39c12">—</span>
+    </div>
+    <div class="stat">
+        <span class="stat-l">Peligrosa / sin datos</span>
+        <span class="stat-v" id="stat-danger" style="color:#e74c3c">—</span>
+    </div>
+</div>
+
+<div id="legend">
+    <h4>Seguridad por calle</h4>
+    <div class="li"><div class="lc" style="background:#27ae60"></div> Segura — iluminada + vereda</div>
+    <div class="li"><div class="lc" style="background:#f39c12"></div> Media — datos parciales</div>
+    <div class="li"><div class="lc" style="background:#e74c3c"></div> Peligrosa — avenida / sin luz</div>
+    <div class="li"><div class="lc" style="background:#555"></div> Sin datos en OSM</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ── Mapa ──────────────────────────────────────────────────────────────────────
+const map = L.map('map').setView([-33.4489, -70.6693], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a>',
+    maxZoom: 19
+}).addTo(map);
+
+// ── Estado ────────────────────────────────────────────────────────────────────
+let originCoords = null, destCoords = null;
+let markerA = null, markerB = null;
+let routeLayers = [];
+let clickCount = 0;
+
+// Recuperar API key guardada
+try {
+    const saved = localStorage.getItem('ors_key');
+    if (saved) document.getElementById('apikey').value = saved;
+} catch(e) {}
+
+// ── Iconos ────────────────────────────────────────────────────────────────────
+function makeIcon(letra, color) {
+    return L.divIcon({
+        className: '',
+        html: `<div style="background:${color};width:30px;height:30px;border-radius:50% 50% 50% 0;
+               transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;
+               border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.5)">
+               <span style="transform:rotate(45deg);color:white;font-weight:700;font-size:12px">${letra}</span>
+               </div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 30]
+    });
+}
+
+// ── Clic en mapa ──────────────────────────────────────────────────────────────
+map.on('click', async function(e) {
+    clickCount++;
+    const { lat, lng } = e.latlng;
+
+    if (clickCount % 2 === 1) {
+        if (markerA) map.removeLayer(markerA);
+        markerA = L.marker([lat, lng], { icon: makeIcon('A', '#27ae60') }).addTo(map);
+        originCoords = { lat, lng };
+        setStatus('Origen marcado ✓ — Ahora clic en el destino');
+        const addr = await reverseGeocode(lat, lng);
+        if (addr) document.getElementById('origin').value = addr;
+    } else {
+        if (markerB) map.removeLayer(markerB);
+        markerB = L.marker([lat, lng], { icon: makeIcon('B', '#e94560') }).addTo(map);
+        destCoords = { lat, lng };
+        setStatus('Destino marcado ✓ — Pulsa "Calcular ruta segura"');
+        const addr = await reverseGeocode(lat, lng);
+        if (addr) document.getElementById('destination').value = addr;
+    }
+});
+
+// ── Geocodificación Nominatim ─────────────────────────────────────────────────
+async function geocode(q) {
+    const r = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q + ', Chile')}&format=json&limit=1`,
+        { headers: { 'Accept-Language': 'es' } }
+    );
+    const d = await r.json();
+    if (!d.length) throw new Error(`No se encontró: "${q}". Prueba con otra dirección.`);
+    return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+}
+
+async function reverseGeocode(lat, lng) {
+    try {
+        const r = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+            { headers: { 'Accept-Language': 'es' } }
+        );
+        const d = await r.json();
+        return d.display_name?.split(',').slice(0, 2).join(',').trim() || null;
+    } catch { return null; }
+}
+
+// ── OpenRouteService ──────────────────────────────────────────────────────────
+async function getRouteORS(o, d, key) {
+    const r = await fetch('https://api.openrouteservice.org/v2/directions/foot-walking/geojson', {
+        method: 'POST',
+        headers: { 'Authorization': key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            coordinates: [[o.lng, o.lat], [d.lng, d.lat]],
+            instructions: false
+        })
+    });
+    if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error?.message || `ORS error ${r.status}`);
+    }
+    return r.json();
+}
+
+// ── Overpass API ──────────────────────────────────────────────────────────────
+var OVERPASS_MIRRORS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter'
+];
+
+async function getOverpassWays(bbox) {
+    // Limitar el área máxima para evitar consultas enormes
+    var area = (bbox.n - bbox.s) * (bbox.e - bbox.w);
+    if (area > 0.02) {
+        console.warn('Área muy grande para Overpass:', area);
+    }
+
+    var q = '[out:json][timeout:25];way["highway"](' +
+            bbox.s + ',' + bbox.w + ',' + bbox.n + ',' + bbox.e +
+            ');out tags geom;';
+
+    // Usar GET para evitar CORS preflight desde file://
+    var url = '?data=' + encodeURIComponent(q);
+    var lastErr = null;
+
+    for (var i = 0; i < OVERPASS_MIRRORS.length; i++) {
+        try {
+            var r = await fetch(OVERPASS_MIRRORS[i] + url);
+            if (!r.ok) { lastErr = 'HTTP ' + r.status; continue; }
+            var data = await r.json();
+            return data.elements;
+        } catch(e) {
+            lastErr = e.message;
+            continue;
+        }
+    }
+
+    throw new Error('Overpass no disponible (' + lastErr + '). Revisa tu conexión.');
+}
+
+function getBbox(coords, pad) {
+    pad = pad || 0.003;
+    let s = 90, n = -90, w = 180, e = -180;
+    for (var i = 0; i < coords.length; i++) {
+        var lon = coords[i][0], lat = coords[i][1];
+        if (lat < s) s = lat; if (lat > n) n = lat;
+        if (lon < w) w = lon; if (lon > e) e = lon;
+    }
+    return { s: s-pad, n: n+pad, w: w-pad, e: e+pad };
+}
+
+// ── Scoring de seguridad ──────────────────────────────────────────────────────
+function scoreWay(tags) {
+    if (!tags) return { score: 50, color: '#555', label: 'Sin datos' };
+    var score = 50;
+    var hw = tags.highway || '';
+
+    if (['pedestrian','footway','path','living_street','steps'].indexOf(hw) >= 0)  score += 25;
+    else if (['residential','service','cycleway'].indexOf(hw) >= 0)                score += 12;
+    else if (['secondary','secondary_link'].indexOf(hw) >= 0)                      score -= 12;
+    else if (['primary','primary_link'].indexOf(hw) >= 0)                          score -= 22;
+    else if (['trunk','trunk_link','motorway','motorway_link'].indexOf(hw) >= 0)   score -= 35;
+
+    if (tags.lit === 'yes')  score += 20;
+    else if (tags.lit === 'no') score -= 20;
+
+    if (tags.sidewalk === 'both') score += 15;
+    else if (['yes','left','right','separate'].indexOf(tags.sidewalk) >= 0) score += 8;
+    else if (tags.sidewalk === 'no') score -= 10;
+
+    if (score < 0) score = 0;
+    if (score > 100) score = 100;
+
+    var color, label;
+    if (score >= 70)      { color = '#27ae60'; label = 'Segura'; }
+    else if (score >= 40) { color = '#f39c12'; label = 'Media'; }
+    else                  { color = '#e74c3c'; label = 'Peligrosa'; }
+
+    return { score: score, color: color, label: label };
+}
+
+// ── Distancia punto a segmento ────────────────────────────────────────────────
+function distPtoSeg(px, py, ax, ay, bx, by) {
+    var dx = bx-ax, dy = by-ay;
+    if (dx===0 && dy===0) return Math.sqrt((px-ax)*(px-ax)+(py-ay)*(py-ay));
+    var t = ((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy);
+    if (t < 0) t = 0; if (t > 1) t = 1;
+    return Math.sqrt((px-ax-t*dx)*(px-ax-t*dx)+(py-ay-t*dy)*(py-ay-t*dy));
+}
+
+function distPtoWay(px, py, geom) {
+    var min = Infinity;
+    for (var i = 0; i < geom.length-1; i++) {
+        var d = distPtoSeg(px, py, geom[i].lon, geom[i].lat, geom[i+1].lon, geom[i+1].lat);
+        if (d < min) min = d;
+    }
+    return min;
+}
+
+function nearestWay(mlon, mlat, ways) {
+    var best = null, bestD = Infinity;
+    for (var i = 0; i < ways.length; i++) {
+        var way = ways[i];
+        if (!way.geometry || way.geometry.length < 2) continue;
+        var d = distPtoWay(mlon, mlat, way.geometry);
+        if (d < bestD) { bestD = d; best = way; }
+    }
+    return bestD < 0.0005 ? best : null;
+}
+
+// ── Función principal ─────────────────────────────────────────────────────────
+async function calcularRuta() {
+    var apiKey = document.getElementById('apikey').value.trim();
+    if (!apiKey) {
+        alert('Necesitas una API key gratuita de openrouteservice.org');
+        return;
+    }
+    try { localStorage.setItem('ors_key', apiKey); } catch(e) {}
+
+    var btn = document.getElementById('btn-calc');
+    btn.disabled = true;
+    btn.textContent = 'Calculando...';
+
+    for (var i = 0; i < routeLayers.length; i++) map.removeLayer(routeLayers[i]);
+    routeLayers = [];
+    document.getElementById('info-box').style.display = 'none';
+    document.getElementById('legend').style.display = 'none';
+
+    try {
+        var originText = document.getElementById('origin').value.trim();
+        var destText   = document.getElementById('destination').value.trim();
+
+        if (originText) {
+            setStatus('Buscando origen...');
+            originCoords = await geocode(originText);
+            if (markerA) map.removeLayer(markerA);
+            markerA = L.marker([originCoords.lat, originCoords.lng], { icon: makeIcon('A','#27ae60') }).addTo(map);
+        }
+        if (!originCoords) throw new Error('Ingresa un origen o haz clic en el mapa.');
+
+        if (destText) {
+            setStatus('Buscando destino...');
+            destCoords = await geocode(destText);
+            if (markerB) map.removeLayer(markerB);
+            markerB = L.marker([destCoords.lat, destCoords.lng], { icon: makeIcon('B','#e94560') }).addTo(map);
+        }
+        if (!destCoords) throw new Error('Ingresa un destino o haz clic en el mapa.');
+
+        setStatus('Calculando ruta a pie (ORS)...');
+        var orsData = await getRouteORS(originCoords, destCoords, apiKey);
+        var coords  = orsData.features[0].geometry.coordinates;
+        var summary = orsData.features[0].properties.summary;
+
+        setStatus('Consultando OpenStreetMap (Overpass)...');
+        var bbox = getBbox(coords);
+        var ways = [];
+        try {
+            ways = await getOverpassWays(bbox);
+        } catch(overpassErr) {
+            console.warn('Overpass falló, mostrando ruta sin scoring:', overpassErr.message);
+            // Continúa sin datos OSM — los segmentos quedan en gris con score 50
+        }
+
+        setStatus('Calculando seguridad por segmento...');
+
+        var totalScore = 0;
+        var safeN = 0, medN = 0, dangerN = 0, unknownN = 0;
+        var segments = [];
+
+        for (var i = 0; i < coords.length - 1; i++) {
+            var lon1 = coords[i][0],   lat1 = coords[i][1];
+            var lon2 = coords[i+1][0], lat2 = coords[i+1][1];
+            var mlon = (lon1+lon2)/2,  mlat = (lat1+lat2)/2;
+
+            var way    = nearestWay(mlon, mlat, ways);
+            var scored = scoreWay(way ? way.tags : null);
+
+            totalScore += scored.score;
+
+            if (!way)                    unknownN++;
+            else if (scored.score >= 70) safeN++;
+            else if (scored.score >= 40) medN++;
+            else                         dangerN++;
+
+            segments.push({
+                ll:    [[lat1,lon1],[lat2,lon2]],
+                color: scored.color,
+                score: scored.score,
+                label: scored.label,
+                tags:  way ? way.tags : {}
+            });
+        }
+
+        for (var i = 0; i < segments.length; i++) {
+            var seg  = segments[i];
+            var hw   = seg.tags.highway  || '—';
+            var lit  = seg.tags.lit === 'yes' ? '✓ Iluminada' : seg.tags.lit === 'no' ? '✗ Sin luz' : '? Sin datos';
+            var sw   = seg.tags.sidewalk ? 'Vereda: ' + seg.tags.sidewalk : 'Vereda: sin datos';
+
+            var line = L.polyline(seg.ll, { color: seg.color, weight: 6, opacity: 0.88 });
+            line.bindTooltip(
+                '<b>' + seg.label + ' · ' + seg.score + '/100</b><br>' +
+                'Vía: <code>' + hw + '</code><br>' +
+                lit + '<br>' + sw,
+                { sticky: true }
+            );
+            line.addTo(map);
+            routeLayers.push(line);
+        }
+
+        var latlngs = [];
+        for (var i = 0; i < coords.length; i++) latlngs.push([coords[i][1], coords[i][0]]);
+        map.fitBounds(L.latLngBounds(latlngs), { padding: [60,60] });
+
+        var n   = segments.length;
+        var avg = Math.round(totalScore / n);
+        var lbl = avg >= 70 ? 'Ruta segura' : avg >= 40 ? 'Ruta media' : 'Ruta peligrosa';
+        var bgc = avg >= 70 ? '#27ae60' : avg >= 40 ? '#f39c12' : '#e74c3c';
+
+        var circle = document.getElementById('score-circle');
+        circle.textContent = avg;
+        circle.style.background = bgc;
+        document.getElementById('score-text').textContent = lbl;
+
+        var dist = summary.distance, dur = summary.duration;
+        document.getElementById('stat-dist').textContent =
+            dist >= 1000 ? (dist/1000).toFixed(2) + ' km' : Math.round(dist) + ' m';
+        document.getElementById('stat-time').textContent =
+            dur >= 3600
+                ? Math.floor(dur/3600) + 'h ' + Math.floor((dur%3600)/60) + ' min'
+                : Math.round(dur/60) + ' min';
+
+        document.getElementById('stat-safe').textContent   = safeN + ' (' + Math.round(safeN/n*100) + '%)';
+        document.getElementById('stat-med').textContent    = medN  + ' (' + Math.round(medN/n*100)  + '%)';
+        document.getElementById('stat-danger').textContent = (dangerN+unknownN) + ' (' + Math.round((dangerN+unknownN)/n*100) + '%)';
+
+        document.getElementById('info-box').style.display = 'block';
+        document.getElementById('legend').style.display   = 'block';
+        clearStatus();
+
+    } catch(e) {
+        clearStatus();
+        alert('Error: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Calcular ruta segura';
+    }
+}
+
+// ── Enter en inputs ───────────────────────────────────────────────────────────
+['origin','destination','apikey'].forEach(function(id) {
+    document.getElementById(id).addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') calcularRuta();
+    });
+});
+
+// ── UI helpers ────────────────────────────────────────────────────────────────
+function setStatus(msg) {
+    var el = document.getElementById('status-msg');
+    el.textContent = msg;
+    el.style.display = 'block';
+}
+function clearStatus() {
+    document.getElementById('status-msg').style.display = 'none';
+}
+</script>
+</body>
+</html>

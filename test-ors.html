@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SafeRoute — Test OpenRouteService</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; height: 100vh; display: flex; flex-direction: column; background: #0f0f1a; }
+
+        #panel {
+            background: #1a1a2e;
+            padding: 14px 16px 10px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            border-bottom: 1px solid #0f3460;
+        }
+
+        .logo { color: #e94560; font-weight: 700; font-size: 18px; align-self: center; white-space: nowrap; margin-right: 4px; }
+
+        .ig {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+            flex: 1;
+            min-width: 180px;
+        }
+
+        label { font-size: 10px; color: #888; letter-spacing: 0.5px; text-transform: uppercase; }
+
+        input[type="text"] {
+            background: #16213e;
+            border: 1px solid #0f3460;
+            color: #eee;
+            padding: 8px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        input[type="text"]:focus { outline: none; border-color: #e94560; }
+        input[type="text"]::placeholder { color: #555; }
+
+        #btn-calc {
+            background: #e94560;
+            color: white;
+            border: none;
+            padding: 9px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            transition: background 0.2s;
+            align-self: flex-end;
+        }
+        #btn-calc:hover { background: #c73652; }
+        #btn-calc:disabled { background: #444; cursor: not-allowed; }
+
+        #tip {
+            background: #16213e;
+            color: #666;
+            font-size: 11px;
+            padding: 5px 16px;
+            border-bottom: 1px solid #0f3460;
+        }
+        #tip span { color: #e94560; }
+
+        #map { flex: 1; }
+
+        #info-box {
+            position: absolute;
+            bottom: 24px;
+            right: 16px;
+            background: #1a1a2e;
+            border: 1px solid #0f3460;
+            border-radius: 10px;
+            padding: 14px 18px;
+            z-index: 1000;
+            min-width: 210px;
+            display: none;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        #info-box h3 { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+        .stat { display: flex; justify-content: space-between; align-items: center; margin: 6px 0; }
+        .stat-label { font-size: 12px; color: #aaa; }
+        .stat-value { font-size: 15px; font-weight: 700; color: #e94560; }
+
+        #status-msg {
+            position: absolute;
+            top: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 8px 18px;
+            border-radius: 20px;
+            z-index: 1000;
+            font-size: 12px;
+            display: none;
+            white-space: nowrap;
+            border: 1px solid #333;
+        }
+
+        #key-notice {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a2e;
+            border: 1px solid #e94560;
+            border-radius: 12px;
+            padding: 24px 28px;
+            z-index: 2000;
+            max-width: 380px;
+            width: 90%;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.7);
+        }
+        #key-notice h2 { color: #e94560; font-size: 16px; margin-bottom: 8px; }
+        #key-notice p { color: #aaa; font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+        #key-notice ol { color: #ccc; font-size: 13px; padding-left: 18px; line-height: 2; margin-bottom: 16px; }
+        #key-notice a { color: #e94560; }
+        #btn-close-notice {
+            background: #e94560; color: white; border: none; padding: 8px 16px;
+            border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+
+<div id="panel">
+    <div class="logo">SafeRoute</div>
+    <div class="ig">
+        <label>Origen</label>
+        <input type="text" id="origin" placeholder="Ej: Plaza de Armas, Santiago" />
+    </div>
+    <div class="ig">
+        <label>Destino</label>
+        <input type="text" id="destination" placeholder="Ej: Estadio Nacional, Santiago" />
+    </div>
+    <div class="ig" style="max-width:240px">
+        <label>API Key — openrouteservice.org</label>
+        <input type="text" id="apikey" placeholder="Pega tu API key aquí" />
+    </div>
+    <button id="btn-calc" onclick="calcularRuta()">Calcular ruta</button>
+</div>
+
+<div id="tip">
+    Haz clic en el mapa para marcar <span>origen</span> (1er clic) y <span>destino</span> (2do clic), o escribe las direcciones arriba.
+</div>
+
+<div id="map"></div>
+
+<div id="info-box">
+    <h3>Ruta a pie</h3>
+    <div class="stat">
+        <span class="stat-label">Distancia</span>
+        <span class="stat-value" id="stat-dist">—</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Tiempo estimado</span>
+        <span class="stat-value" id="stat-time">—</span>
+    </div>
+    <div class="stat">
+        <span class="stat-label">Motor</span>
+        <span class="stat-value" style="font-size:12px;color:#888">OpenRouteService</span>
+    </div>
+</div>
+
+<div id="status-msg"></div>
+
+<div id="key-notice">
+    <h2>Necesitas una API key gratis</h2>
+    <p>OpenRouteService es gratuito. Regístrate y obtén tu key en segundos:</p>
+    <ol>
+        <li>Ve a <a href="https://openrouteservice.org/dev/#/signup" target="_blank">openrouteservice.org</a></li>
+        <li>Crea una cuenta gratuita</li>
+        <li>Copia tu API key del dashboard</li>
+        <li>Pégala en el campo <strong>API Key</strong> arriba</li>
+    </ol>
+    <p style="font-size:11px;color:#666">Límite gratis: 2,000 rutas/día. Más que suficiente para pruebas.</p>
+    <button id="btn-close-notice" onclick="document.getElementById('key-notice').style.display='none'">Entendido, ya tengo mi key</button>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+    // --- Mapa ---
+    const map = L.map('map', { zoomControl: true }).setView([-33.4489, -70.6693], 13);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© <a href="https://openstreetmap.org">OpenStreetMap</a> contributors',
+        maxZoom: 19
+    }).addTo(map);
+
+    // --- Estado ---
+    let originCoords = null;
+    let destCoords = null;
+    let markerOrigen = null;
+    let markerDestino = null;
+    let routeLayer = null;
+    let clickCount = 0;
+
+    // --- Iconos ---
+    function makeIcon(letra, color) {
+        return L.divIcon({
+            className: '',
+            html: `<div style="
+                background:${color};width:32px;height:32px;border-radius:50% 50% 50% 0;
+                transform:rotate(-45deg);display:flex;align-items:center;justify-content:center;
+                border:2px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4)">
+                <span style="transform:rotate(45deg);color:white;font-weight:700;font-size:13px">${letra}</span>
+            </div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+    }
+
+    // --- Clic en mapa ---
+    map.on('click', async function(e) {
+        clickCount++;
+        const { lat, lng } = e.latlng;
+
+        if (clickCount % 2 === 1) {
+            // Origen
+            if (markerOrigen) map.removeLayer(markerOrigen);
+            markerOrigen = L.marker([lat, lng], { icon: makeIcon('A', '#27ae60') }).addTo(map);
+            originCoords = { lat, lng };
+            status('Origen marcado ✓  — Ahora haz clic en el destino');
+            const addr = await reverseGeocode(lat, lng);
+            if (addr) document.getElementById('origin').value = addr;
+        } else {
+            // Destino
+            if (markerDestino) map.removeLayer(markerDestino);
+            markerDestino = L.marker([lat, lng], { icon: makeIcon('B', '#e94560') }).addTo(map);
+            destCoords = { lat, lng };
+            status('Destino marcado ✓  — Pulsa "Calcular ruta"');
+            const addr = await reverseGeocode(lat, lng);
+            if (addr) document.getElementById('destination').value = addr;
+        }
+    });
+
+    // --- Geocodificación (Nominatim, sin key) ---
+    async function geocode(query) {
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + ', Chile')}&format=json&limit=1`;
+        const r = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+        const d = await r.json();
+        if (!d.length) throw new Error(`No se encontró: "${query}". Prueba con otra dirección.`);
+        return { lat: parseFloat(d[0].lat), lng: parseFloat(d[0].lon) };
+    }
+
+    async function reverseGeocode(lat, lng) {
+        try {
+            const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`, { headers: { 'Accept-Language': 'es' } });
+            const d = await r.json();
+            return d.display_name?.split(',').slice(0, 2).join(',').trim() || null;
+        } catch { return null; }
+    }
+
+    // --- Calcular ruta ---
+    async function calcularRuta() {
+        const apiKey = document.getElementById('apikey').value.trim();
+        if (!apiKey) {
+            document.getElementById('key-notice').style.display = 'block';
+            return;
+        }
+
+        const btn = document.getElementById('btn-calc');
+        btn.disabled = true;
+        btn.textContent = 'Calculando...';
+
+        try {
+            // Resolver origen
+            const originText = document.getElementById('origin').value.trim();
+            if (originText) {
+                status('Buscando origen...');
+                originCoords = await geocode(originText);
+                if (markerOrigen) map.removeLayer(markerOrigen);
+                markerOrigen = L.marker([originCoords.lat, originCoords.lng], { icon: makeIcon('A', '#27ae60') }).addTo(map);
+            } else if (!originCoords) {
+                throw new Error('Ingresa un origen o haz clic en el mapa para marcarlo.');
+            }
+
+            // Resolver destino
+            const destText = document.getElementById('destination').value.trim();
+            if (destText) {
+                status('Buscando destino...');
+                destCoords = await geocode(destText);
+                if (markerDestino) map.removeLayer(markerDestino);
+                markerDestino = L.marker([destCoords.lat, destCoords.lng], { icon: makeIcon('B', '#e94560') }).addTo(map);
+            } else if (!destCoords) {
+                throw new Error('Ingresa un destino o haz clic en el mapa para marcarlo.');
+            }
+
+            status('Calculando ruta a pie con ORS...');
+
+            // Llamada a ORS — foot-walking
+            const res = await fetch('https://api.openrouteservice.org/v2/directions/foot-walking/geojson', {
+                method: 'POST',
+                headers: {
+                    'Authorization': apiKey,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    coordinates: [
+                        [originCoords.lng, originCoords.lat],   // ORS = [lon, lat]
+                        [destCoords.lng, destCoords.lat]
+                    ],
+                    instructions: false,
+                    preference: 'recommended'
+                })
+            });
+
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                const msg = err.error?.message || err.message || `HTTP ${res.status}`;
+                throw new Error(`ORS: ${msg}`);
+            }
+
+            const geojson = await res.json();
+
+            // Dibujar ruta
+            if (routeLayer) map.removeLayer(routeLayer);
+            routeLayer = L.geoJSON(geojson, {
+                style: { color: '#e94560', weight: 5, opacity: 0.85 }
+            }).addTo(map);
+
+            map.fitBounds(routeLayer.getBounds(), { padding: [60, 60] });
+
+            // Mostrar estadísticas
+            const summary = geojson.features[0].properties.summary;
+            const dist = summary.distance;
+            const dur  = summary.duration;
+
+            document.getElementById('stat-dist').textContent =
+                dist >= 1000 ? `${(dist / 1000).toFixed(2)} km` : `${Math.round(dist)} m`;
+
+            document.getElementById('stat-time').textContent =
+                dur >= 3600
+                    ? `${Math.floor(dur / 3600)}h ${Math.floor((dur % 3600) / 60)} min`
+                    : `${Math.round(dur / 60)} min`;
+
+            document.getElementById('info-box').style.display = 'block';
+            clearStatus();
+
+        } catch (e) {
+            clearStatus();
+            alert('Error: ' + e.message);
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Calcular ruta';
+        }
+    }
+
+    // --- Enter en inputs ---
+    ['origin', 'destination', 'apikey'].forEach(id => {
+        document.getElementById(id).addEventListener('keypress', e => {
+            if (e.key === 'Enter') calcularRuta();
+        });
+    });
+
+    // --- Helpers UI ---
+    function status(msg) {
+        const el = document.getElementById('status-msg');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+    function clearStatus() {
+        document.getElementById('status-msg').style.display = 'none';
+    }
+</script>
+</body>
+</html>
