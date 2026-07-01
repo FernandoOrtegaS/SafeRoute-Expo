@@ -542,7 +542,7 @@ export default function HomeScreen() {
   if (!initRegion) {
     return (
       <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text>Obteniendo tu ubicación segura...</Text>
+        <Text>Obteniendo tu ubicación...</Text>
       </View>
     );
   }

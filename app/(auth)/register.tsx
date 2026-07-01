@@ -6,6 +6,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { supabase } from '../../utils/supabase';
+import { containsProfanity } from '@/utils/textfilter';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
@@ -27,6 +28,10 @@ export default function RegisterScreen() {
     }
     if (password.length < 6) {
       Alert.alert('Contraseña corta', 'La contraseña debe tener al menos 6 caracteres.');
+      return;
+    }
+    if (containsProfanity(name) || containsProfanity(email)) {
+      Alert.alert('Nombre de usuario o E-mail no permitido.')
       return;
     }
     setLoading(true);

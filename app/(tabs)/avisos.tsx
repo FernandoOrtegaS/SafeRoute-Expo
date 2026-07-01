@@ -8,6 +8,8 @@ import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../utils/supabase';
 
+import { censorText } from '@/utils/textfilter';
+
 type IncidentCategory = 'robo' | 'trafico' | 'iluminacion' | 'infraestructura' | 'seguridad' | 'otro';
 type IncidentUrgency = 'urgente' | 'normal';
 
@@ -267,11 +269,14 @@ export default function AvisosScreen() {
     const finalTitle = reportTitle.trim() ||
       (CATEGORY_OPTIONS.find(c => c.value === reportCategory)?.label ?? 'Incidente');
 
+    const cleanTitle = censorText(finalTitle);
+    const cleanDesc = censorText(reportDescription.trim());
+
     const { error } = await supabase.from('incidents').insert({
       user_id: user.id,
       category: reportCategory,
-      title: finalTitle,
-      description: reportDescription.trim() || null,
+      title: cleanTitle,
+      description: cleanDesc || null,
       address: reportAddressText || null,
       latitude: reportLocation.latitude,
       longitude: reportLocation.longitude,
